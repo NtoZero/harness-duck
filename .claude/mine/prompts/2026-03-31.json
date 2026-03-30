@@ -1,0 +1,14 @@
+[
+  {
+    "timestamp": "2026-03-30T23:51:19.996Z",
+    "role": "user",
+    "session_id": "ce3b7d9c-07dc-48b7-bb33-1ae7f3ba3cbe",
+    "content": "커밋 스킬 하나 생성해줘. 기능단위로 쪼개서 커밋하고 co-author 와 같은 불필요 정보는 기록하지 않는 것으로. 표준 메시지 형식을 따랐으면 좋겠어."
+  },
+  {
+    "timestamp": "2026-03-30T23:54:41.048Z",
+    "role": "user",
+    "session_id": "ce3b7d9c-07dc-48b7-bb33-1ae7f3ba3cbe",
+    "content": "/commit"
+  }
+]
