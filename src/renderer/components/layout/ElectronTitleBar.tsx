@@ -11,7 +11,8 @@ export const ElectronTitleBar: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        WebkitAppRegion: 'drag' as unknown as string,
+        // @ts-expect-error Electron-specific CSS property
+        WebkitAppRegion: 'drag',
         borderBottom: '1px solid var(--color-border-default)',
         flexShrink: 0,
         paddingLeft: 80, // macOS traffic lights
@@ -30,7 +31,8 @@ export const ElectronTitleBar: React.FC = () => {
       <div
         style={{
           display: 'flex',
-          WebkitAppRegion: 'no-drag' as unknown as string,
+          // @ts-expect-error Electron-specific CSS property
+          WebkitAppRegion: 'no-drag',
         }}
       >
         {[

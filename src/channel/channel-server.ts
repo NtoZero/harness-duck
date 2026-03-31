@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 // ClaudeTeam — Custom MCP Channel Server (per Agent)
 // Each agent gets one instance. Claude Code spawns this as a subprocess.
 // stdio transport for MCP, HTTP inbound for message delivery from Router.
