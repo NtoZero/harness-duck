@@ -35,13 +35,14 @@ description: "변경사항을 기능 단위로 분리하여 Conventional Commits
 
 ### subject (필수)
 
-- 소문자 시작, 마침표 없음, 명령형
+- **한글로 작성**, 마침표 없음, 명령형
 - 50자 이내
 - "무엇을 했는가"가 아니라 "왜 했는가"에 집중
 
 ### body (선택)
 
 - subject만으로 충분하면 생략
+- **한글로 작성**
 - 변경 동기나 이전 동작과의 차이를 설명할 때만 작성
 
 ## 워크플로우
@@ -80,9 +81,9 @@ staged + unstaged 변경을 모두 확인한다.
 ```bash
 git add <specific-files>
 git commit -m "$(cat <<'EOF'
-type(scope): subject
+type(scope): 한글 subject
 
-body (필요시)
+한글 body (필요시)
 EOF
 )"
 ```
