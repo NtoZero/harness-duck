@@ -1,0 +1,149 @@
+:root {
+  /* Background */
+  --color-bg-base: #1e1e2e;
+  --color-bg-mantle: #181825;
+  --color-bg-crust: #11111b;
+  --color-bg-surface0: #313244;
+  --color-bg-surface1: #45475a;
+  --color-bg-surface2: #585b70;
+  --color-bg-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Text */
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #a6adc8;
+  --color-text-tertiary: #6c7086;
+  --color-text-inverse: #1e1e2e;
+
+  /* Accent */
+  --color-accent-blue: #89b4fa;
+  --color-accent-blue-hover: #b4d0fb;
+  --color-accent-mauve: #cba6f7;
+  --color-accent-teal: #94e2d5;
+
+  /* Status */
+  --color-status-running: #a6e3a1;
+  --color-status-idle: #6c7086;
+  --color-status-waiting: #f9e2af;
+  --color-status-error: #f38ba8;
+  --color-status-typing: #89b4fa;
+
+  /* Notification */
+  --color-notify-info: #89b4fa;
+  --color-notify-warning: #fab387;
+  --color-notify-error: #f38ba8;
+  --color-notify-success: #a6e3a1;
+
+  /* Border */
+  --color-border-default: #313244;
+  --color-border-subtle: #45475a;
+  --color-border-focus: #89b4fa;
+
+  /* Agent avatar colors */
+  --color-agent-0: #89b4fa;
+  --color-agent-1: #a6e3a1;
+  --color-agent-2: #f9e2af;
+  --color-agent-3: #cba6f7;
+  --color-agent-4: #fab387;
+  --color-agent-5: #94e2d5;
+  --color-agent-6: #f38ba8;
+  --color-agent-7: #74c7ec;
+
+  /* Typography */
+  --font-family-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 24px;
+  --font-size-terminal: 13px;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+
+  /* Spacing (4px scale) */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --sidebar-min-width: 180px;
+  --sidebar-max-width: 360px;
+  --chat-panel-width: 320px;
+  --chat-panel-min-width: 280px;
+  --chat-panel-max-width: 480px;
+  --file-tree-width: 200px;
+  --file-tree-min-width: 150px;
+  --file-tree-max-width: 300px;
+  --content-min-width: 400px;
+  --titlebar-height: 36px;
+  --titlebar-button-width: 46px;
+  --tab-height: 36px;
+  --tab-min-width: 80px;
+  --tab-max-width: 160px;
+
+  /* Modal */
+  --modal-width-sm: 400px;
+  --modal-width-md: 480px;
+  --modal-width-lg: 640px;
+  --modal-max-height: 80vh;
+
+  /* Border radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 12px;
+  --border-radius-full: 9999px;
+  --border-width-default: 1px;
+  --border-width-focus: 2px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 12px 48px rgba(0, 0, 0, 0.6);
+
+  /* Animation */
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-typing: 1500ms;
+  --easing-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-Index */
+  --z-base: 0;
+  --z-sidebar: 10;
+  --z-panel: 20;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 500;
+  --z-modal: 510;
+  --z-toast: 600;
+  --z-tooltip: 700;
+  --z-context-menu: 800;
+
+  /* Icon */
+  --icon-size-sm: 16px;
+  --icon-size-md: 20px;
+  --icon-size-lg: 24px;
+
+  /* Focus */
+  --focus-ring-color: #89b4fa;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-style: 0 0 0 var(--focus-ring-width) var(--focus-ring-color);
+}
