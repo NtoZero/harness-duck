@@ -126,26 +126,22 @@ npm install
 npx electron-rebuild
 ```
 
-### 4-2. 빌드 (3단계)
+### 4-2. 빌드
 
 ```bash
-# 1단계: Renderer 빌드 (React → dist/renderer/)
-npx vite build
-
-# 2단계: Main Process 빌드 (TypeScript → dist/main/)
-npx tsc -p tsconfig.main.json
-
-# 3단계: Channel Server 빌드 (Bun)
-bun build src/channel/channel-server.ts --outdir dist/channel --target bun
+# 전체 빌드 (Renderer + Main Process + Channel Server)
+npm run build:all
 ```
 
-또는 npm 스크립트:
+내부적으로 3단계를 순차 실행한다:
 
-```bash
-npm run build          # Renderer (vite build)
-npm run build:main     # Main Process (tsc)
-npm run build:channel  # Channel Server (bun)
-```
+| 단계 | npm 스크립트 | 내용 | 산출물 |
+|------|-------------|------|--------|
+| 1 | `npm run build` | Renderer (React → Vite 번들) | `dist/renderer/` |
+| 2 | `npm run build:main` | Main Process (TypeScript → CommonJS) | `dist/main/` |
+| 3 | `npm run build:channel` | Channel Server (Bun 번들) | `dist/channel/` |
+
+개별 단계만 실행하려면 해당 스크립트를 직접 호출한다.
 
 ### 4-3. 빌드 확인
 
