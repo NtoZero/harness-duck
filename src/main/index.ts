@@ -1,6 +1,6 @@
 // ClaudeTeam — Electron Main Process Entry Point
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import { SessionStore } from './session-store';
 import { MessageRouter } from './message-router';
@@ -27,6 +27,18 @@ async function createWindow(): Promise<void> {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  // Set CSP via response headers (works reliably with file:// protocol)
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' file: data:; script-src 'self' file: 'unsafe-inline'; style-src 'self' file: 'unsafe-inline'; connect-src 'self' http://127.0.0.1:*; img-src 'self' file: data:",
+        ],
+      },
+    });
   });
 
   // Initialize backend services
