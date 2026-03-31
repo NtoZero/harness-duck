@@ -217,7 +217,7 @@ frontend-dev와 backend-dev가 각각 독립적으로 preload 파일을 작성�
 | Renderer ↔ Main | IPC (contextBridge) | UI 조작, 에이전트 관리, 파일 I/O |
 | Main ↔ Channel Server | HTTP (localhost) | 메시지 라우팅, 에이전트 등록 |
 | Channel Server ↔ Claude Code | stdio (MCP) | AI 에이전트 통신 |
-| Main ↔ SQLite | better-sqlite3 | 영속화 (에이전트, 메시지, 설정) |
+| Main ↔ SQLite | sql.js (WebAssembly) | 영속화 (에이전트, 메시지, 설정) |
 
 ---
 
@@ -225,16 +225,17 @@ frontend-dev와 backend-dev가 각각 독립적으로 preload 파일을 작성�
 
 | 레이어 | 기술 | 버전 |
 |--------|------|------|
-| Desktop Shell | Electron | 33.x |
+| Desktop Shell | Electron | 41.x |
 | Renderer | React + TypeScript | 19.x / 5.7+ |
 | 상태 관리 | Zustand | 5.x |
 | 터미널 | @xterm/xterm | 5.5+ |
-| 코드 뷰어 | react-syntax-highlighter | 15.x |
+| 코드 뷰어 | react-syntax-highlighter | 16.x |
 | 마크다운 | react-markdown | 9.x |
 | 아이콘 | lucide-react | 0.469+ |
-| Main Process | node-pty, better-sqlite3 | 1.x / 11.x |
+| Main Process | node-pty, sql.js (WebAssembly) | 1.x / 1.11+ |
 | Channel Server | Bun + @modelcontextprotocol/sdk | 1.12+ |
 | 빌드 | Vite + @vitejs/plugin-react | 6.x |
+| 패키징 | electron-builder | 26.x |
 
 ---
 
@@ -263,28 +264,94 @@ frontend-dev와 backend-dev가 각각 독립적으로 preload 파일을 작성�
 
 ---
 
-## 8. 빌드 및 실행 방법
+## 8. 포스트 빌드 패치 (v0.1.1)
+
+초기 빌드(v0.1.0) 이후 실제 Electron 앱 실행까지 발견된 이슈들을 해결한 패치 내역.
+
+### 8.1 빌드 에러 수정
+
+| 커밋 | 내용 |
+|------|------|
+| `ff094a6` | **tsc 빌드 에러 4건** — Bun 타입(`bun-types`) 미인식, Electron 전용 CSS(`WebkitAppRegion`) TS 에러. `tsconfig.json`에 `exclude: ["src/channel", "src/main"]` 추가, `@ts-expect-error` 주석 처리 |
+| `75abce6` | **Main Process 출력 경로 오류** — `tsconfig.main.json`의 `rootDir: "."`가 `dist/main/src/main/index.js` 경로를 생성. `rootDir: "src"`로 변경하여 `dist/main/main/index.js` 출력. `package.json`의 `main`/`start` 경로도 수정 |
+
+### 8.2 네이티브 모듈 호환성
+
+| 커밋 | 내용 |
+|------|------|
+| `0776e31` | **better-sqlite3 ABI 불일치** — Node.js MODULE_VERSION 127 vs Electron 145 충돌. `better-sqlite3` → `sql.js`(WebAssembly) 전환. `session-store.ts` 전면 재작성 (동기→비동기 초기화, `waitReady()` 패턴, `persist()` 메서드 추가). 네이티브 빌드 의존성 제거로 `electron-rebuild` 불필요 |
+
+### 8.3 Electron file:// 프로토콜 호환성 (빈 화면 수정)
+
+앱이 실행되지만 **빈 흰색 화면**만 표시되는 문제. 3가지 근본 원인을 단계적으로 발견하고 해결했다.
+
+| 원인 | 상세 | 수정 |
+|------|------|------|
+| **CSP가 JS 실행 차단** | `<meta http-equiv="Content-Security-Policy">`의 `script-src 'self'`가 `file://` 프로토콜에서 origin=null이 되어 모든 스크립트 로딩 차단 | HTML에서 CSP 제거 → `session.defaultSession.webRequest.onHeadersReceived()`로 Main Process에서 CSP 설정 |
+| **Vite crossorigin 속성** | Vite가 `<script>`, `<link>`에 `crossorigin` 속성을 자동 삽입. `file://`에는 CORS 서버가 없어 스크립트 로드 실패 | Vite 커스텀 플러그인 `removeCrossOrigin()`으로 빌드 시 속성 제거 |
+| **Vite base 절대 경로** | Vite 기본 `base: '/'`가 `src="/assets/..."` 절대 경로 생성. `file://`에서 시스템 루트 `/assets/` 참조 | `base: './'`로 상대 경로(`./assets/...`) 설정 |
+
+**디버깅 과정:**
+
+```
+1. ELECTRON_ENABLE_LOGGING=1 로 로그 캡처
+2. console-message 이벤트로 Renderer 콘솔 → Main stdout 전달
+3. did-finish-load 발생하지만 console-message 없음 → JS 미실행 확인
+4. CSP 제거 후 JS 실행 확인 → CSP가 원인
+5. executeJavaScript('document.getElementById("root").innerHTML') → React 렌더링 확인
+6. getComputedStyle(document.body).backgroundColor → rgb(30, 30, 46) 다크 테마 확인
+```
+
+### 8.4 의존성 보안 취약점 해결
+
+| 커밋 | 내용 |
+|------|------|
+| `1106ef1` | **npm 취약점 15건 → 0건** — `npm audit fix --force`로 메이저 업그레이드 |
+
+| 패키지 | 이전 | 이후 | 취약점 |
+|--------|------|------|--------|
+| electron | 33.x | 41.1.0 | ASAR Integrity Bypass (moderate) |
+| electron-builder | 25.x | 26.8.1 | tar 경로 순회 취약점 9건 (high) |
+| react-syntax-highlighter | 15.x | 16.1.1 | PrismJS DOM Clobbering (moderate) |
+
+### 8.5 문서 업데이트
+
+| 커밋 | 내용 |
+|------|------|
+| `11eec28` | 배포 가이드 — 사전 설치를 Homebrew 기반으로 변경 (Bun은 curl 유지), 이미 생성된 파일 설명으로 수정 |
+| `07a5206` | 빌드 섹션에 `npm run build:all` 통합 빌드 명령 추가 |
+
+### 8.6 수정된 파일 요약
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `vite.config.ts` | `base: './'`, `removeCrossOrigin()` 플러그인, `modulePreload: { polyfill: false }` |
+| `src/main/index.ts` | CSP를 `session.webRequest.onHeadersReceived`로 이동, `session` import 추가 |
+| `index.html` | CSP `<meta>` 태그 제거 (Main Process에서 설정) |
+| `src/main/session-store.ts` | better-sqlite3 → sql.js 전면 재작성 |
+| `tsconfig.json` | `exclude: ["src/channel", "src/main"]` 추가 |
+| `tsconfig.main.json` | `rootDir: "src"` 수정 |
+| `package.json` | electron 41, electron-builder 26, sql.js, main/start 경로 수정 |
+
+---
+
+## 9. 빌드 및 실행 방법
 
 ```bash
 # 의존성 설치
 npm install
 
-# 타입 체크
-npm run typecheck
+# 전체 빌드 (Renderer + Main + Channel)
+npm run build:all
 
-# Renderer 빌드 (Vite)
-npm run build
-
-# Main Process 빌드
-npm run build:main
-
-# Channel Server 빌드 (Bun)
-npm run build:channel
-
-# Electron 앱 실행
+# Electron 앱 실행 (프로덕션 모드)
 npm start
 
-# 개발 모드
-npm run dev          # Renderer (Vite dev server)
-npm run dev:main     # Main Process (tsc --watch)
+# 개발 모드 (Vite dev server + Electron 동시 실행)
+npm run dev          # 1번 터미널: Renderer (Vite dev server :5173)
+npm run dev:main     # 2번 터미널: Main Process (tsc --watch)
+NODE_ENV=development npm start  # 3번 터미널: Electron 실행
 ```
+
+> **참고:** 프로덕션 모드(`npm start`)는 빌드된 `dist/renderer/index.html`을 로드합니다.
+> 개발 모드(`NODE_ENV=development`)는 Vite dev server(`localhost:5173`)에 연결하며, DevTools가 자동으로 열립니다.
