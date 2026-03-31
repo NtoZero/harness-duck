@@ -31,6 +31,7 @@ async function createWindow(): Promise<void> {
 
   // Initialize backend services
   store = new SessionStore();
+  await store.waitReady();
   const settings = store.getAppSettings();
 
   router = new MessageRouter(store, {
