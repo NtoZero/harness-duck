@@ -68,7 +68,7 @@ claudeteam/
 │       └── types.ts       # 공유 타입 정의
 ├── package.json
 ├── tsconfig.json          # Renderer 타입 체크
-├── tsconfig.main.json     # Main Process 컴파일 (생성 필요)
+├── tsconfig.main.json     # Main Process 컴파일
 ├── vite.config.ts         # Vite 빌드 설정
 └── index.html             # Renderer HTML 엔트리
 ```
@@ -89,71 +89,21 @@ dist/
 
 ---
 
-## 3. 실행 전 필수 설정
+## 3. 빌드 설정 파일 안내
 
-현재 코드베이스에 누락된 설정 파일이 있다. 실행 전 아래 파일을 생성해야 한다.
+프로젝트에 포함된 빌드 설정 파일의 역할을 설명한다.
 
-### 3-1. `tsconfig.main.json` (Main Process 컴파일용)
+### 3-1. `tsconfig.main.json` — Main Process 컴파일
 
-`package.json`의 `build:main` 스크립트가 이 파일을 참조한다.
+`npm run build:main` 스크립트가 이 파일을 참조하여 `src/main/`을 `dist/main/`으로 컴파일한다. Renderer용 `tsconfig.json`과 분리되어 있으며, CommonJS 모듈로 출력한다.
 
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "outDir": "dist/main",
-    "rootDir": "src/main",
-    "declaration": false,
-    "sourceMap": true
-  },
-  "include": ["src/main/**/*", "src/shared/**/*"]
-}
-```
+### 3-2. `electron-builder.yml` — macOS 패키징
 
-### 3-2. `electron-builder.yml` (패키징 설정, 선택)
+`npm run package` 스크립트가 이 파일을 참조하여 .dmg 및 .zip을 생성한다. 코드 서명이 필요한 경우 9절을 참조.
 
-macOS .dmg 패키징이 필요한 경우에만 생성한다.
+### 3-3. `vite.config.ts` — Renderer 빌드
 
-```yaml
-appId: com.claudeteam.app
-productName: ClaudeTeam
-directories:
-  output: release
-  buildResources: build
-files:
-  - dist/**/*
-  - node_modules/**/*
-  - "!node_modules/**/README*"
-  - "!node_modules/**/*.md"
-mac:
-  category: public.app-category.developer-tools
-  target:
-    - dmg
-    - zip
-dmg:
-  contents:
-    - x: 130
-      y: 220
-    - x: 410
-      y: 220
-      type: link
-      path: /Applications
-```
-
-### 3-3. Electron 의존성 분리 (권장)
-
-`electron`과 `node-pty`는 `devDependencies`로 이동하는 것이 좋다. 현재 `dependencies`에 포함되어 있어 `electron-builder` 패키징 시 중복될 수 있다.
-
-```bash
-npm install --save-dev electron node-pty
-```
+Vite + React 플러그인으로 `src/renderer/`를 `dist/renderer/`로 번들링한다. `@shared`, `@renderer` 경로 alias를 정의한다.
 
 ---
 
@@ -358,21 +308,13 @@ rm -rf ~/Library/Application\ Support/ClaudeTeam/*.db
 
 ## 9. 패키징 (macOS .dmg)
 
-### 사전 준비
-
-```bash
-# electron-builder 설치
-npm install --save-dev electron-builder
-
-# electron-builder.yml 생성 (3-2 절 참조)
-```
-
 ### 빌드 및 패키징
 
+`electron-builder`와 `electron-builder.yml`은 이미 프로젝트에 포함되어 있다.
+
 ```bash
-# 전체 빌드 + 패키징
-npm run build && npm run build:main && npm run build:channel
-npx electron-builder --mac
+# 전체 빌드 + 패키징 (한 줄)
+npm run package
 ```
 
 산출물: `release/ClaudeTeam-0.1.0.dmg`
@@ -396,8 +338,6 @@ npx electron-builder --mac --publish never
 
 | 항목 | 상태 | 영향 |
 |------|------|------|
-| `tsconfig.main.json` 누락 | 생성 필요 | `npm run build:main` 실패 |
-| `electron-builder.yml` 누락 | 선택 | .dmg 패키징 불가 |
 | `waiting_approval` 상태 전이 | TODO | 권한 승인 시 UI 상태 미갱신 |
 | Settings 영속화 | TODO | 설정 변경이 재시작 시 초기화 |
 | Spring Boot API (`src/api/`) | 미구현 | Main Process에 기능 통합됨 |
@@ -409,16 +349,14 @@ npx electron-builder --mac --publish never
 ## 11. 빠른 시작 (Quick Start)
 
 ```bash
-# 1. 누락 설정 파일 생성 (tsconfig.main.json — 3-1절 참조)
-
-# 2. 설치
+# 1. 설치
 npm install
 npx electron-rebuild
 
-# 3. 빌드
-npm run build && npm run build:main && npm run build:channel
+# 2. 빌드
+npm run build:all
 
-# 4. 실행
+# 3. 실행
 npm start
 ```
 
