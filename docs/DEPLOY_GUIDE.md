@@ -9,21 +9,32 @@
 
 | 도구 | 최소 버전 | 확인 명령 | 용도 |
 |------|----------|----------|------|
+| Homebrew | - | `brew -v` | macOS 패키지 관리 |
 | Node.js | 20.x+ | `node -v` | Electron, Renderer 빌드 |
-| npm | 10.x+ | `npm -v` | 패키지 관리 |
+| npm | 10.x+ | `npm -v` | 패키지 관리 (Node.js에 포함) |
 | Bun | 1.x+ | `bun -v` | MCP Channel Server 빌드 |
 | Python | 3.x | `python3 --version` | node-pty 네이티브 빌드 (node-gyp) |
 | Xcode CLI Tools | - | `xcode-select -p` | macOS 네이티브 모듈 컴파일 |
 
 ### macOS 사전 설치
 
+모든 의존성을 Homebrew로 관리한다.
+
 ```bash
-# Xcode CLI Tools (node-pty, better-sqlite3 네이티브 빌드에 필요)
+# 1. Homebrew 설치 (없는 경우)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. Xcode CLI Tools (네이티브 모듈 빌드에 필요, brew 설치 시 자동 설치될 수 있음)
 xcode-select --install
 
-# Bun (Channel Server 빌드용)
-curl -fsSL https://bun.sh/install | bash
+# 3. 런타임 & 빌드 도구 일괄 설치
+brew install node bun python@3
+
+# 4. 설치 확인
+node -v && npm -v && bun -v && python3 --version
 ```
+
+> **참고:** `brew install node`는 npm을 함께 설치한다. Python은 macOS에 기본 포함되어 있지만 node-gyp 호환성을 위해 Homebrew 버전을 권장한다.
 
 ---
 
