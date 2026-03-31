@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ChevronDown, ChevronUp, FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { api } from '../../ipc/api';
 import type { AgentCreateInput } from '@shared/types';
 
 interface AgentCreateDialogProps {
@@ -143,6 +144,10 @@ export const AgentCreateDialog: React.FC<AgentCreateDialogProps> = ({
                   style={{ ...inputStyle, flex: 1 }}
                 />
                 <button
+                  onClick={async () => {
+                    const selected = await api.dialog.openDirectory();
+                    if (selected) setWorkingDirectory(selected);
+                  }}
                   style={{
                     padding: 'var(--space-2)',
                     backgroundColor: 'var(--color-bg-surface0)',

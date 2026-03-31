@@ -108,6 +108,12 @@ const electronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_SAVE, settings),
   },
 
+  // ─── Dialog ───
+  dialog: {
+    openDirectory: (): Promise<ApiResponse<string>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.DIALOG_OPEN_DIRECTORY),
+  },
+
   // ─── Window Controls ───
   window: {
     minimize: (): void => ipcRenderer.send(IPC_CHANNELS.WINDOW_MINIMIZE),

@@ -1,7 +1,7 @@
 // ClaudeTeam — IPC Handlers
 // Renderer <-> Main Process 통신 핸들러 등록
 
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { IPC_CHANNELS } from '../shared/types';
@@ -200,6 +200,19 @@ export function registerIpcHandlers(
       return { success: true };
     },
   );
+
+  // ─── Dialog ───
+
+  ipcMain.handle(IPC_CHANNELS.DIALOG_OPEN_DIRECTORY, async (): Promise<ApiResponse<string>> => {
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: '작업 디렉토리 선택',
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, data: '' };
+    }
+    return { success: true, data: result.filePaths[0] };
+  });
 
   // ─── Window Controls ───
 

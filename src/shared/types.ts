@@ -245,4 +245,6 @@ export const IPC_CHANNELS = {
   WINDOW_MINIMIZE: 'window:minimize',
   WINDOW_MAXIMIZE: 'window:maximize',
   WINDOW_CLOSE: 'window:close',
+  // Dialog
+  DIALOG_OPEN_DIRECTORY: 'dialog:open-directory',
 } as const;

@@ -140,6 +140,13 @@ export const api = {
     },
   },
 
+  dialog: {
+    /** Opens native directory picker. Returns selected path or empty string if canceled. */
+    openDirectory: async (): Promise<string> => {
+      return unwrap(await getElectron().dialog.openDirectory());
+    },
+  },
+
   window: {
     minimize: (): void => getElectron().window.minimize(),
     maximize: (): void => getElectron().window.maximize(),
@@ -182,6 +189,7 @@ function getMock(): ElectronAPI {
       get: () => Promise.resolve({ success: true, data: undefined }),
       save: ok,
     },
+    dialog: { openDirectory: () => Promise.resolve({ success: true, data: '' }) },
     window: { minimize: noop, maximize: noop, close: noop },
   } as unknown as ElectronAPI;
 
