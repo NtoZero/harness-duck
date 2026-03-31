@@ -18,7 +18,7 @@
 
 ### macOS 사전 설치
 
-모든 의존성을 Homebrew로 관리한다.
+Homebrew 기반으로 관리하되, Bun은 Homebrew에 없으므로 자체 설치 스크립트를 사용한다.
 
 ```bash
 # 1. Homebrew 설치 (없는 경우)
@@ -27,14 +27,18 @@
 # 2. Xcode CLI Tools (네이티브 모듈 빌드에 필요, brew 설치 시 자동 설치될 수 있음)
 xcode-select --install
 
-# 3. 런타임 & 빌드 도구 일괄 설치
-brew install node bun python@3
+# 3. Node.js, Python 설치 (Homebrew)
+brew install node python@3
 
-# 4. 설치 확인
+# 4. Bun 설치 (자체 설치 스크립트)
+curl -fsSL https://bun.sh/install | bash
+source ~/.zshrc   # 또는 터미널 재시작
+
+# 5. 설치 확인
 node -v && npm -v && bun -v && python3 --version
 ```
 
-> **참고:** `brew install node`는 npm을 함께 설치한다. Python은 macOS에 기본 포함되어 있지만 node-gyp 호환성을 위해 Homebrew 버전을 권장한다.
+> **참고:** `brew install node`는 npm을 함께 설치한다. Python은 macOS에 기본 포함되어 있지만 node-gyp 호환성을 위해 Homebrew 버전을 권장한다. Bun은 Homebrew formula가 없으므로 공식 설치 스크립트를 사용한다.
 
 ---
 
