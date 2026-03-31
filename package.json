@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "ClaudeTeam - Multi-agent orchestration desktop app",
-  "main": "dist/main/index.js",
+  "main": "dist/main/main/index.js",
   "scripts": {
     "dev": "vite",
     "dev:main": "tsc -p tsconfig.main.json --watch",
@@ -11,7 +11,7 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:channel": "bun build src/channel/channel-server.ts --outdir dist/channel --target bun",
     "preview": "vite preview",
-    "start": "electron dist/main/index.js",
+    "start": "electron dist/main/main/index.js",
     "build:all": "npm run build && npm run build:main && npm run build:channel",
     "package": "npm run build:all && electron-builder --mac",
     "lint": "eslint src/ --ext .ts,.tsx",

@@ -363,5 +363,5 @@ npm start
 npm run dev
 
 # 터미널 2
-npm run build:main && NODE_ENV=development npx electron dist/main/index.js
+npm run build:main && NODE_ENV=development npx electron dist/main/main/index.js
 ```
