@@ -11,6 +11,7 @@ import type {
   ChatMessage,
   AppSettings,
   ApiResponse,
+  AutoApproveRule,
   FileReadRequest,
   FileListRequest,
   FileSearchRequest,
@@ -110,8 +111,36 @@ export function registerIpcHandlers(
   ipcMain.handle(
     IPC_CHANNELS.APPROVAL_RESPOND,
     async (_event, approvalId: string, approved: boolean): Promise<ApiResponse> => {
-      // TODO: integrate with approval system when agent requires permission
-      return { success: true };
+      try {
+        agentManager.handleApprovalResponse(approvalId, approved);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: (err as Error).message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APPROVAL_GET_RULES,
+    async (): Promise<ApiResponse<AutoApproveRule[]>> => {
+      try {
+        const rules = agentManager.getAutoApproveRules();
+        return { success: true, data: rules };
+      } catch (err) {
+        return { success: false, error: (err as Error).message };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.APPROVAL_SAVE_RULES,
+    async (_event, rules: AutoApproveRule[]): Promise<ApiResponse> => {
+      try {
+        agentManager.setAutoApproveRules(rules);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: (err as Error).message };
+      }
     },
   );
 

@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { EventEmitter } from 'events';
 import { v4 as uuid } from 'uuid';
-import type { AgentConfig, AgentState } from '../shared/types';
+import type { AgentConfig, AgentState, ApprovalRequest, AutoApproveRule } from '../shared/types';
 import type { SessionStore } from './session-store';
 import type { MessageRouter } from './message-router';
 
@@ -15,6 +15,7 @@ interface ManagedAgent {
   state: AgentState;
   ptyProcess: pty.IPty | null;
   channelProcess: ChildProcessLike | null;
+  outputBuffer: string;
 }
 
 interface ChildProcessLike {
@@ -22,9 +23,24 @@ interface ChildProcessLike {
   kill: (signal?: string) => void;
 }
 
+interface PendingApproval {
+  agentId: string;
+  agentName: string;
+  description: string;
+  timestamp: Date;
+}
+
+// Patterns for detecting Claude Code approval prompts
+const APPROVAL_PATTERN = /\[Y\/n\]/;
+// Patterns for parsing token usage from Claude Code output
+const TOKEN_USAGE_PATTERN = /Total tokens:\s*input\s*=\s*(\d+),\s*output\s*=\s*(\d+)/i;
+const TOKEN_COST_PATTERN = /(?:Total cost|Cost):\s*\$[\d.]+\s*.*?(\d+)\s*input.*?(\d+)\s*output/i;
+
 export class AgentManager extends EventEmitter {
   private agents = new Map<string, ManagedAgent>();
   private nextPort = 7700;
+  private pendingApprovals = new Map<string, PendingApproval>();
+  private autoApproveRules: AutoApproveRule[] = [];
 
   constructor(
     private store: SessionStore,
@@ -32,6 +48,7 @@ export class AgentManager extends EventEmitter {
   ) {
     super();
     this.restoreAgents();
+    this.autoApproveRules = this.store.getAutoApproveRules();
   }
 
   // ─── Agent Lifecycle ───
@@ -75,7 +92,7 @@ export class AgentManager extends EventEmitter {
       lastActivity: new Date(),
     };
 
-    this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null });
+    this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '' });
     this.store.saveAgent(config);
     this.emitStateUpdate(state);
 
@@ -117,10 +134,11 @@ export class AgentManager extends EventEmitter {
     managed.state.status = 'running';
     managed.state.lastActivity = new Date();
 
-    // Forward PTY data to renderer
+    // Forward PTY data to renderer + detect approvals and token usage
     ptyProcess.onData((data) => {
       this.emit('terminal-data', { agentId: config.id, data });
       managed.state.lastActivity = new Date();
+      this.processTerminalOutput(managed, data);
     });
 
     ptyProcess.onExit(({ exitCode }) => {
@@ -209,6 +227,42 @@ export class AgentManager extends EventEmitter {
     }
   }
 
+  // ─── Approval System ───
+
+  handleApprovalResponse(approvalId: string, approved: boolean): void {
+    const pending = this.pendingApprovals.get(approvalId);
+    if (!pending) {
+      throw new Error(`No pending approval found: ${approvalId}`);
+    }
+
+    const managed = this.findAgentById(pending.agentId);
+    if (!managed?.ptyProcess) {
+      this.pendingApprovals.delete(approvalId);
+      throw new Error(`Agent not running: ${pending.agentName}`);
+    }
+
+    // Send 'y' or 'n' to the terminal
+    managed.ptyProcess.write(approved ? 'y\n' : 'n\n');
+
+    // Restore agent state
+    managed.state.status = 'running';
+    this.emitStateUpdate(managed.state);
+
+    // Log to audit
+    this.store.logAudit('human', approved ? 'approve' : 'deny', pending.agentName, approved);
+
+    this.pendingApprovals.delete(approvalId);
+  }
+
+  setAutoApproveRules(rules: AutoApproveRule[]): void {
+    this.autoApproveRules = rules;
+    this.store.saveAutoApproveRules(rules);
+  }
+
+  getAutoApproveRules(): AutoApproveRule[] {
+    return this.autoApproveRules;
+  }
+
   // ─── Query ───
 
   getAgentState(nameOrId: string): AgentState | null {
@@ -250,7 +304,7 @@ export class AgentManager extends EventEmitter {
         tokenUsage: { input: 0, output: 0 },
         lastActivity: new Date(),
       };
-      this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null });
+      this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '' });
       if (config.channelPort >= this.nextPort) {
         this.nextPort = config.channelPort + 1;
       }
@@ -346,5 +400,133 @@ ${sharedDocs ? `# Shared Documents\n\n${sharedDocs}\n` : ''}
 
   private emitStateUpdate(state: AgentState): void {
     this.emit('agent-state-update', { ...state });
+  }
+
+  // ─── Terminal Output Processing ───
+
+  private processTerminalOutput(managed: ManagedAgent, data: string): void {
+    // Buffer output for multi-chunk pattern matching
+    managed.outputBuffer += data;
+
+    // Keep buffer from growing unbounded (retain last 4KB)
+    if (managed.outputBuffer.length > 4096) {
+      managed.outputBuffer = managed.outputBuffer.slice(-4096);
+    }
+
+    // Detect approval request pattern [Y/n]
+    if (APPROVAL_PATTERN.test(data) && managed.state.status === 'running') {
+      this.handleApprovalDetected(managed);
+    }
+
+    // Detect token usage pattern
+    this.detectTokenUsage(managed);
+  }
+
+  private handleApprovalDetected(managed: ManagedAgent): void {
+    // Extract description from recent output buffer (last few lines before [Y/n])
+    const lines = managed.outputBuffer.split('\n');
+    const lastLines = lines.slice(-5).join(' ').trim();
+    // Strip ANSI escape codes for clean description
+    const description = lastLines.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
+
+    // Check auto-approve rules first
+    if (this.shouldAutoApprove(managed.config.name, description)) {
+      if (managed.ptyProcess) {
+        managed.ptyProcess.write('y\n');
+      }
+      this.store.logAudit('auto-approve', 'approve', managed.config.name, true);
+      return;
+    }
+
+    // Create pending approval
+    const approvalId = uuid();
+    this.pendingApprovals.set(approvalId, {
+      agentId: managed.config.id,
+      agentName: managed.config.name,
+      description,
+      timestamp: new Date(),
+    });
+
+    // Transition state to waiting_approval
+    managed.state.status = 'waiting_approval';
+    this.emitStateUpdate(managed.state);
+
+    // Emit approval request event
+    const approvalRequest: ApprovalRequest = {
+      id: approvalId,
+      agentId: managed.config.id,
+      agentName: managed.config.name,
+      action: 'tool_use',
+      target: managed.config.workingDirectory,
+      description,
+      status: 'pending',
+      timestamp: new Date(),
+    };
+
+    this.emit('approval-request', approvalRequest);
+
+    // Also emit via router-event so it reaches the renderer
+    this.router.emit('router-event', {
+      type: 'approval_request',
+      data: approvalRequest,
+    });
+  }
+
+  private shouldAutoApprove(agentName: string, description: string): boolean {
+    for (const rule of this.autoApproveRules) {
+      if (!rule.enabled) continue;
+
+      // Check agent name match
+      if (rule.agentName !== '*' && rule.agentName !== agentName) continue;
+
+      // Check pattern match (simple glob-like: * matches anything)
+      try {
+        const regexStr = rule.pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*');
+        const regex = new RegExp(regexStr, 'i');
+        if (regex.test(description)) {
+          return true;
+        }
+      } catch {
+        // Invalid pattern, skip
+        continue;
+      }
+    }
+    return false;
+  }
+
+  private detectTokenUsage(managed: ManagedAgent): void {
+    let match = TOKEN_USAGE_PATTERN.exec(managed.outputBuffer);
+    if (!match) {
+      match = TOKEN_COST_PATTERN.exec(managed.outputBuffer);
+    }
+
+    if (match) {
+      const inputTokens = parseInt(match[1], 10);
+      const outputTokens = parseInt(match[2], 10);
+
+      if (!isNaN(inputTokens) && !isNaN(outputTokens)) {
+        managed.state.tokenUsage = {
+          input: inputTokens,
+          output: outputTokens,
+        };
+        this.emitStateUpdate(managed.state);
+
+        // Check warning threshold
+        const totalTokens = inputTokens + outputTokens;
+        const threshold = this.store.getAppSettings().tokenWarningThreshold;
+        if (totalTokens >= threshold) {
+          this.router.emit('router-event', {
+            type: 'loop_warning',
+            message: `Agent "${managed.config.name}" token usage (${totalTokens}) exceeded threshold (${threshold}).`,
+            conversation: '*',
+          });
+        }
+
+        // Clear the matched portion from buffer to avoid re-matching
+        managed.outputBuffer = '';
+      }
+    }
   }
 }

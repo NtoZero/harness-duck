@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   AppSettings,
   ApprovalRequest,
+  AutoApproveRule,
   ApiResponse,
   FileReadRequest,
   FileListRequest,
@@ -85,6 +86,12 @@ const electronAPI = {
       ipcRenderer.on(IPC_CHANNELS.APPROVAL_REQUEST, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.APPROVAL_REQUEST, handler);
     },
+
+    getRules: (): Promise<ApiResponse<AutoApproveRule[]>> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APPROVAL_GET_RULES),
+
+    saveRules: (rules: AutoApproveRule[]): Promise<ApiResponse> =>
+      ipcRenderer.invoke(IPC_CHANNELS.APPROVAL_SAVE_RULES, rules),
   },
 
   // ─── File System ───

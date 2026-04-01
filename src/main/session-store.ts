@@ -11,6 +11,7 @@ import type {
   AppSettings,
   TeamPreset,
   AgentCreateInput,
+  AutoApproveRule,
 } from '../shared/types';
 
 const DATA_DIR = path.join(os.homedir(), '.claudeteam');
@@ -123,6 +124,18 @@ export class SessionStore {
       `);
       this.db.run('CREATE INDEX idx_audit_created ON audit_log(created_at)');
       this.db.run('INSERT INTO schema_version (version) VALUES (1)');
+    }
+
+    if (currentVersion < 2) {
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS auto_approve_rules (
+          id TEXT PRIMARY KEY,
+          agent_name TEXT NOT NULL,
+          pattern TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 1
+        );
+      `);
+      this.db.run('INSERT OR IGNORE INTO schema_version (version) VALUES (2)');
     }
   }
 
@@ -361,6 +374,28 @@ export class SessionStore {
       target: r.target as string,
       allowed: r.allowed === 1,
       createdAt: new Date(r.created_at as string),
+    }));
+  }
+
+  // ─── Auto Approve Rules ───
+
+  saveAutoApproveRules(rules: AutoApproveRule[]): void {
+    this.db.run('DELETE FROM auto_approve_rules');
+    for (const rule of rules) {
+      this.db.run(
+        'INSERT INTO auto_approve_rules (id, agent_name, pattern, enabled) VALUES (?, ?, ?, ?)',
+        [rule.id, rule.agentName, rule.pattern, rule.enabled ? 1 : 0],
+      );
+    }
+    this.persist();
+  }
+
+  getAutoApproveRules(): AutoApproveRule[] {
+    return this.queryAll('SELECT * FROM auto_approve_rules').map((r) => ({
+      id: r.id as string,
+      agentName: r.agent_name as string,
+      pattern: r.pattern as string,
+      enabled: r.enabled === 1,
     }));
   }
 

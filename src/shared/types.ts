@@ -234,6 +234,8 @@ export const IPC_CHANNELS = {
   // Approval
   APPROVAL_REQUEST: 'approval:request',
   APPROVAL_RESPOND: 'approval:respond',
+  APPROVAL_GET_RULES: 'approval:get-rules',
+  APPROVAL_SAVE_RULES: 'approval:save-rules',
   // File
   FILE_READ: 'file:read',
   FILE_LIST: 'file:list',
