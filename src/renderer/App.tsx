@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ElectronTitleBar } from './components/layout/ElectronTitleBar';
 import { MainLayout } from './components/layout/MainLayout';
 import { NotificationStack } from './components/common/NotificationStack';
@@ -12,6 +12,7 @@ import { useUIStore } from './stores/uiStore';
 import { useAgentStore } from './stores/agentStore';
 import { useApprovalStore } from './stores/approvalStore';
 import { useFileStore } from './stores/fileStore';
+import { api } from './ipc/api';
 import type { AppSettings } from '@shared/types';
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -22,7 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxConversationDepth: 5,
   tokenWarningThreshold: 100000,
   writeScope: 'own_repo',
-  killAllShortcut: 'Cmd+Shift+K',
+  killAllShortcut: 'CmdOrCtrl+Shift+K',
   teamPresets: [],
   sharedDocPaths: [],
   allowedReadPaths: [],
@@ -37,6 +38,13 @@ export const App: React.FC = () => {
   const createAgent = useAgentStore((s) => s.createAgent);
   const approvalStore = useApprovalStore();
   const openFile = useFileStore((s) => s.openFile);
+
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    api.settings.get().then(setSettings).catch(() => {});
+    approvalStore.loadRules();
+  }, []);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
@@ -63,10 +71,10 @@ export const App: React.FC = () => {
 
       <SettingsPanel
         isOpen={openModals.has('settings')}
-        settings={DEFAULT_SETTINGS}
-        onSave={(settings) => {
-          // TODO: persist via IPC
-          console.log('save settings', settings);
+        settings={settings}
+        onSave={async (newSettings) => {
+          await api.settings.save(newSettings);
+          setSettings(newSettings);
         }}
         onClose={() => closeModal('settings')}
       />

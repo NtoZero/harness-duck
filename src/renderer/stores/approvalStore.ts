@@ -11,6 +11,7 @@ interface ApprovalStore {
   approve: (ids: string[]) => Promise<void>;
   deny: (ids: string[]) => Promise<void>;
   setAutoRules: (rules: AutoApproveRule[]) => void;
+  loadRules: () => Promise<void>;
 }
 
 export const useApprovalStore = create<ApprovalStore>((set, get) => ({
@@ -50,5 +51,17 @@ export const useApprovalStore = create<ApprovalStore>((set, get) => ({
     }));
   },
 
-  setAutoRules: (rules) => set({ autoRules: rules }),
+  setAutoRules: (rules) => {
+    set({ autoRules: rules });
+    api.approval.saveRules(rules).catch(() => {});
+  },
+
+  loadRules: async () => {
+    try {
+      const rules = await api.approval.getRules();
+      set({ autoRules: rules });
+    } catch {
+      // fallback to empty
+    }
+  },
 }));

@@ -13,6 +13,7 @@ import type {
   AgentCreateInput,
   ChatMessage,
   ApprovalRequest,
+  AutoApproveRule,
   AppSettings,
   ApiResponse,
   FileReadRequest,
@@ -114,6 +115,12 @@ export const api = {
     onRequest: (cb: (request: ApprovalRequest) => void): (() => void) => {
       return getElectron().approval.onRequest(cb);
     },
+    getRules: async (): Promise<AutoApproveRule[]> => {
+      return unwrap(await getElectron().approval.getRules());
+    },
+    saveRules: async (rules: AutoApproveRule[]): Promise<void> => {
+      unwrap(await getElectron().approval.saveRules(rules));
+    },
   },
 
   file: {
@@ -179,7 +186,7 @@ function getMock(): ElectronAPI {
       onMessage: noopUnsub,
       onLoopWarning: noopUnsub,
     },
-    approval: { respond: ok, onRequest: noopUnsub },
+    approval: { respond: ok, onRequest: noopUnsub, getRules: () => Promise.resolve({ success: true, data: [] }), saveRules: ok },
     file: {
       read: () => Promise.resolve({ success: true, data: '' }),
       list: () => Promise.resolve({ success: true, data: '' }),

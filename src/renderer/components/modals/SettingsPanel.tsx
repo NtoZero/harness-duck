@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import type { AppSettings } from '@shared/types';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import type { AppSettings, TeamPreset, AgentCreateInput } from '@shared/types';
 
 interface SettingsPanelProps {
   isOpen: boolean;
   settings: AppSettings;
-  onSave: (settings: AppSettings) => void;
+  onSave: (settings: AppSettings) => void | Promise<void>;
   onClose: () => void;
 }
 
@@ -19,6 +19,11 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [draft, setDraft] = useState<AppSettings>(settings);
+
+  // Sync draft when settings are loaded asynchronously
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
 
   if (!isOpen) return null;
 
@@ -207,14 +212,274 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
             )}
 
             {activeTab === 'team' && (
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                팀 프리셋 및 공유 문서 경로 관리 (구현 예정)
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                {/* Team Presets */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                    <label style={labelStyle}>팀 프리셋</label>
+                    <button
+                      onClick={() => {
+                        const newPreset: TeamPreset = {
+                          id: crypto.randomUUID(),
+                          name: '',
+                          agents: [],
+                          createdAt: new Date(),
+                        };
+                        updateDraft('teamPresets', [...draft.teamPresets, newPreset]);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-1)',
+                        padding: 'var(--space-1) var(--space-2)',
+                        fontSize: 'var(--font-size-xs)',
+                        color: 'var(--color-accent-blue)',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: '1px solid var(--color-accent-blue)',
+                        borderRadius: 'var(--border-radius-sm)',
+                      }}
+                    >
+                      <Plus size={14} /> 프리셋 추가
+                    </button>
+                  </div>
+
+                  {draft.teamPresets.length === 0 && (
+                    <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-sm)', padding: 'var(--space-3)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--border-radius-sm)' }}>
+                      등록된 프리셋이 없습니다.
+                    </div>
+                  )}
+
+                  {draft.teamPresets.map((preset, pi) => (
+                    <div
+                      key={preset.id}
+                      style={{
+                        marginBottom: 'var(--space-3)',
+                        padding: 'var(--space-3)',
+                        border: '1px solid var(--color-border-default)',
+                        borderRadius: 'var(--border-radius-sm)',
+                        backgroundColor: 'var(--color-bg-surface0)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+                        <input
+                          placeholder="프리셋 이름"
+                          value={preset.name}
+                          onChange={(e) => {
+                            const updated = [...draft.teamPresets];
+                            updated[pi] = { ...updated[pi], name: e.target.value };
+                            updateDraft('teamPresets', updated);
+                          }}
+                          style={{ ...inputStyle, flex: 1 }}
+                        />
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>
+                          에이전트 {preset.agents.length}개
+                        </span>
+                        <button
+                          onClick={() => updateDraft('teamPresets', draft.teamPresets.filter((_, i) => i !== pi))}
+                          style={{ color: 'var(--color-status-error)', cursor: 'pointer', background: 'none', border: 'none', padding: 'var(--space-1)' }}
+                          title="프리셋 삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+
+                      {/* Agent list in preset */}
+                      {preset.agents.map((agent, ai) => (
+                        <div key={ai} style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-1)', alignItems: 'center' }}>
+                          <input
+                            placeholder="이름"
+                            value={agent.name}
+                            onChange={(e) => {
+                              const updated = [...draft.teamPresets];
+                              const agents = [...updated[pi].agents];
+                              agents[ai] = { ...agents[ai], name: e.target.value };
+                              updated[pi] = { ...updated[pi], agents };
+                              updateDraft('teamPresets', updated);
+                            }}
+                            style={{ ...inputStyle, flex: 1 }}
+                          />
+                          <input
+                            placeholder="역할"
+                            value={agent.role}
+                            onChange={(e) => {
+                              const updated = [...draft.teamPresets];
+                              const agents = [...updated[pi].agents];
+                              agents[ai] = { ...agents[ai], role: e.target.value };
+                              updated[pi] = { ...updated[pi], agents };
+                              updateDraft('teamPresets', updated);
+                            }}
+                            style={{ ...inputStyle, flex: 1 }}
+                          />
+                          <select
+                            value={agent.model}
+                            onChange={(e) => {
+                              const updated = [...draft.teamPresets];
+                              const agents = [...updated[pi].agents];
+                              agents[ai] = { ...agents[ai], model: e.target.value as 'sonnet' | 'opus' };
+                              updated[pi] = { ...updated[pi], agents };
+                              updateDraft('teamPresets', updated);
+                            }}
+                            style={{ ...inputStyle, width: 100, flex: 'none' }}
+                          >
+                            <option value="sonnet">Sonnet</option>
+                            <option value="opus">Opus</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const updated = [...draft.teamPresets];
+                              const agents = updated[pi].agents.filter((_, i) => i !== ai);
+                              updated[pi] = { ...updated[pi], agents };
+                              updateDraft('teamPresets', updated);
+                            }}
+                            style={{ color: 'var(--color-status-error)', cursor: 'pointer', background: 'none', border: 'none', padding: 'var(--space-1)' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const updated = [...draft.teamPresets];
+                          const newAgent: AgentCreateInput = { name: '', workingDirectory: '', role: '', model: 'sonnet' };
+                          updated[pi] = { ...updated[pi], agents: [...updated[pi].agents, newAgent] };
+                          updateDraft('teamPresets', updated);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-1)',
+                          padding: 'var(--space-1) var(--space-2)',
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                          background: 'none',
+                          border: '1px dashed var(--color-border-default)',
+                          borderRadius: 'var(--border-radius-sm)',
+                          marginTop: 'var(--space-1)',
+                        }}
+                      >
+                        <Plus size={12} /> 에이전트 추가
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Shared Doc Paths */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+                    <label style={labelStyle}>공유 문서 경로</label>
+                    <button
+                      onClick={() => updateDraft('sharedDocPaths', [...draft.sharedDocPaths, ''])}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-1)',
+                        padding: 'var(--space-1) var(--space-2)',
+                        fontSize: 'var(--font-size-xs)',
+                        color: 'var(--color-accent-blue)',
+                        cursor: 'pointer',
+                        background: 'none',
+                        border: '1px solid var(--color-accent-blue)',
+                        borderRadius: 'var(--border-radius-sm)',
+                      }}
+                    >
+                      <Plus size={14} /> 경로 추가
+                    </button>
+                  </div>
+
+                  {draft.sharedDocPaths.length === 0 && (
+                    <div style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-sm)', padding: 'var(--space-3)', textAlign: 'center', border: '1px dashed var(--color-border-default)', borderRadius: 'var(--border-radius-sm)' }}>
+                      등록된 공유 경로가 없습니다.
+                    </div>
+                  )}
+
+                  {draft.sharedDocPaths.map((p, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-1)', alignItems: 'center' }}>
+                      <input
+                        placeholder="/path/to/shared/docs"
+                        value={p}
+                        onChange={(e) => {
+                          const updated = [...draft.sharedDocPaths];
+                          updated[i] = e.target.value;
+                          updateDraft('sharedDocPaths', updated);
+                        }}
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                      <button
+                        onClick={() => updateDraft('sharedDocPaths', draft.sharedDocPaths.filter((_, idx) => idx !== i))}
+                        style={{ color: 'var(--color-status-error)', cursor: 'pointer', background: 'none', border: 'none', padding: 'var(--space-1)' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {activeTab === 'advanced' && (
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                고급 설정 (구현 예정)
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                <div>
+                  <label style={labelStyle}>Router HTTP 포트</label>
+                  <input
+                    type="number"
+                    value={draft.routerPort}
+                    onChange={(e) => updateDraft('routerPort', parseInt(e.target.value, 10))}
+                    min={1024}
+                    max={65535}
+                    style={{ ...inputStyle, width: 120 }}
+                  />
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>1024-65535</span>
+                </div>
+                <div>
+                  <label style={labelStyle}>최대 대화 깊이</label>
+                  <input
+                    type="number"
+                    value={draft.maxConversationDepth}
+                    onChange={(e) => updateDraft('maxConversationDepth', parseInt(e.target.value, 10))}
+                    min={1}
+                    max={50}
+                    style={{ ...inputStyle, width: 80 }}
+                  />
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>왕복 횟수</span>
+                </div>
+                <div>
+                  <label style={labelStyle}>토큰 경고 임계값</label>
+                  <input
+                    type="number"
+                    value={draft.tokenWarningThreshold}
+                    onChange={(e) => updateDraft('tokenWarningThreshold', parseInt(e.target.value, 10))}
+                    min={1000}
+                    step={10000}
+                    style={{ ...inputStyle, width: 140 }}
+                  />
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginLeft: 'var(--space-2)' }}>토큰</span>
+                </div>
+                <div>
+                  <label style={labelStyle}>쓰기 범위</label>
+                  <select
+                    value={draft.writeScope}
+                    onChange={(e) => updateDraft('writeScope', e.target.value as AppSettings['writeScope'])}
+                    style={inputStyle}
+                  >
+                    <option value="own_repo">자기 레포만 (own_repo)</option>
+                    <option value="allowed_paths">허용 경로 내 (allowed_paths)</option>
+                    <option value="unrestricted">제한 없음 (unrestricted)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Kill All 단축키</label>
+                  <input
+                    value={draft.killAllShortcut}
+                    onChange={(e) => updateDraft('killAllShortcut', e.target.value)}
+                    placeholder="Cmd+Shift+K"
+                    style={{ ...inputStyle, width: 200 }}
+                  />
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-1)' }}>
+                    모든 에이전트를 즉시 중지하는 긴급 단축키
+                  </div>
+                </div>
               </div>
             )}
           </div>
