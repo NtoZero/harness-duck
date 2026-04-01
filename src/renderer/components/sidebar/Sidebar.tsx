@@ -37,7 +37,7 @@ export const Sidebar: React.FC = () => {
     position: { x: number; y: number };
   } | null>(null);
 
-  const totalTokens = agents.reduce((sum, a) => sum + a.tokenUsage.input + a.tokenUsage.output, 0);
+  const totalTokens = agents.reduce((sum, a) => sum + (a.tokenUsage?.input ?? 0) + (a.tokenUsage?.output ?? 0), 0);
   const activeCount = agents.filter((a) => a.status === 'running').length;
 
   const handleContextMenu = (e: React.MouseEvent, agent: AgentState) => {
@@ -153,7 +153,7 @@ export const Sidebar: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
               <StatusIndicator status={agent.status} size={6} />
               <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
-                {formatTokens(agent.tokenUsage.input)}
+                {formatTokens(agent.tokenUsage?.input ?? 0)}
               </span>
             </div>
           </div>

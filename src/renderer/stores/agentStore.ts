@@ -22,10 +22,14 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   setActiveAgent: (id) => set({ activeAgentId: id }),
 
   createAgent: async (input) => {
-    const agent = await api.agent.create(input);
-    set((s) => ({ agents: [...s.agents, agent] }));
-    if (!get().activeAgentId) {
-      set({ activeAgentId: agent.id });
+    try {
+      const agent = await api.agent.create(input);
+      set((s) => ({ agents: [...s.agents, agent] }));
+      if (!get().activeAgentId) {
+        set({ activeAgentId: agent.id });
+      }
+    } catch (err) {
+      console.error('Failed to create agent:', err);
     }
   },
 

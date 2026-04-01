@@ -56,8 +56,7 @@ export const api = {
   agent: {
     create: async (input: AgentCreateInput): Promise<AgentState> => {
       const res = await getElectron().agent.create(input);
-      // Main returns AgentConfig as data; cast to AgentState shape
-      return unwrap(res) as unknown as AgentState;
+      return unwrap(res) as AgentState;
     },
     start: async (id: string): Promise<void> => {
       unwrap(await getElectron().agent.start(id));

@@ -30,10 +30,22 @@ export function registerIpcHandlers(
 ): void {
   // ─── Agent Lifecycle ───
 
-  ipcMain.handle(IPC_CHANNELS.AGENT_CREATE, async (_event, input: AgentCreateInput): Promise<ApiResponse> => {
+  ipcMain.handle(IPC_CHANNELS.AGENT_CREATE, async (_event, input: AgentCreateInput): Promise<ApiResponse<AgentState>> => {
     try {
       const config = await agentManager.createAgent(input);
-      return { success: true, data: config };
+      // Return AgentState (not AgentConfig) so renderer has tokenUsage, status etc.
+      const state: AgentState = {
+        id: config.id,
+        name: config.name,
+        workingDirectory: config.workingDirectory,
+        status: 'idle',
+        model: config.model,
+        pid: undefined,
+        channelPort: config.channelPort,
+        tokenUsage: { input: 0, output: 0 },
+        lastActivity: new Date(),
+      };
+      return { success: true, data: state };
     } catch (err) {
       return { success: false, error: (err as Error).message };
     }
