@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ElectronTitleBar } from './components/layout/ElectronTitleBar';
 import { MainLayout } from './components/layout/MainLayout';
 import { NotificationStack } from './components/common/NotificationStack';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { AgentCreateDialog } from './components/modals/AgentCreateDialog';
 import { ApprovalDashboard } from './components/modals/ApprovalDashboard';
 import { SettingsPanel } from './components/modals/SettingsPanel';
@@ -42,11 +43,12 @@ export const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    api.settings.get().then(setSettings).catch(() => {});
+    api.settings.get().then((s) => { if (s) setSettings(s); }).catch(() => {});
     approvalStore.loadRules();
   }, []);
 
   return (
+    <ErrorBoundary>
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <ElectronTitleBar />
       <MainLayout />
@@ -85,5 +87,6 @@ export const App: React.FC = () => {
         onClose={() => closeModal('quickOpen')}
       />
     </div>
+    </ErrorBoundary>
   );
 };

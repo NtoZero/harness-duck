@@ -172,7 +172,11 @@ function getMock(): ElectronAPI {
 
   _mock = {
     agent: {
-      create: () => Promise.resolve({ success: true, data: {} }),
+      create: (input: AgentCreateInput) => Promise.resolve({ success: true, data: {
+        id: `mock-${Date.now()}`, name: input.name, workingDirectory: input.workingDirectory,
+        status: 'idle', model: input.model ?? 'sonnet', tokenUsage: { input: 0, output: 0 },
+        lastActivity: new Date(),
+      } }),
       start: ok,
       stop: ok,
       restart: ok,
@@ -192,7 +196,11 @@ function getMock(): ElectronAPI {
       search: () => Promise.resolve({ success: true, data: [] }),
     },
     settings: {
-      get: () => Promise.resolve({ success: true, data: undefined }),
+      get: () => Promise.resolve({ success: true, data: {
+        theme: 'dark', language: 'ko', defaultModel: 'sonnet', routerPort: 7632,
+        maxConversationDepth: 5, tokenWarningThreshold: 100000, writeScope: 'own_repo',
+        killAllShortcut: 'CmdOrCtrl+Shift+K', teamPresets: [], sharedDocPaths: [], allowedReadPaths: [],
+      } }),
       save: ok,
     },
     dialog: { openDirectory: () => Promise.resolve({ success: true, data: '' }) },
