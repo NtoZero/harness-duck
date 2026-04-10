@@ -34,19 +34,39 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   },
 
   startAgent: async (id) => {
-    await api.agent.start(id);
+    try {
+      await api.agent.start(id);
+    } catch (err) {
+      console.error('Failed to start agent:', err);
+      throw err;
+    }
   },
 
   stopAgent: async (id) => {
-    await api.agent.stop(id);
+    try {
+      await api.agent.stop(id);
+    } catch (err) {
+      console.error('Failed to stop agent:', err);
+      throw err;
+    }
   },
 
   restartAgent: async (id) => {
-    await api.agent.restart(id);
+    try {
+      await api.agent.restart(id);
+    } catch (err) {
+      console.error('Failed to restart agent:', err);
+      throw err;
+    }
   },
 
   killAll: async () => {
-    await api.agent.killAll();
+    try {
+      await api.agent.killAll();
+    } catch (err) {
+      console.error('Failed to kill all agents:', err);
+      throw err;
+    }
   },
 
   updateAgentState: (updated) => {

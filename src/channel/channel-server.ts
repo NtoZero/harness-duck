@@ -121,6 +121,12 @@ if (CHANNEL_PORT > 0) {
         return new Response('Method not allowed', { status: 405 });
       }
 
+      // Body size limit (1MB)
+      const contentLength = parseInt(req.headers.get('content-length') || '0', 10);
+      if (contentLength > 1_048_576) {
+        return new Response('Payload too large', { status: 413 });
+      }
+
       try {
         const body = (await req.json()) as {
           from: string;
@@ -131,18 +137,22 @@ if (CHANNEL_PORT > 0) {
         };
 
         // Push notification to Claude Code via MCP channel
-        await mcp.notification({
-          method: 'notifications/claude/channel',
-          params: {
-            content: body.message,
-            meta: {
-              sender: body.from,
-              chat_id: body.chatId,
-              type: body.type,
-              files: body.files ?? [],
+        try {
+          await mcp.notification({
+            method: 'notifications/claude/channel',
+            params: {
+              content: body.message,
+              meta: {
+                sender: body.from,
+                chat_id: body.chatId,
+                type: body.type,
+                files: body.files ?? [],
+              },
             },
-          },
-        });
+          });
+        } catch (notifErr) {
+          console.error(`[claudeteam-channel] MCP notification failed: ${(notifErr as Error).message}`);
+        }
 
         return new Response('ok', { status: 200 });
       } catch (err) {
@@ -193,17 +203,19 @@ async function deregisterFromDaemon(): Promise<void> {
 }
 
 process.on('SIGINT', async () => {
+  clearInterval(heartbeatInterval);
   await deregisterFromDaemon();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
+  clearInterval(heartbeatInterval);
   await deregisterFromDaemon();
   process.exit(0);
 });
 
 // Heartbeat to daemon
-setInterval(async () => {
+const heartbeatInterval = setInterval(async () => {
   try {
     await fetch(`http://127.0.0.1:${ROUTER_PORT}/api/agents/heartbeat`, {
       method: 'POST',

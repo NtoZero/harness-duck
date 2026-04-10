@@ -17,7 +17,7 @@ export const TerminalPane: React.FC<TerminalPaneProps> = ({ agentId }) => {
     if (!containerRef.current) return;
 
     const terminal = new Terminal({
-      fontFamily: 'var(--font-family-mono)',
+      fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace',
       fontSize: 13,
       theme: {
         background: '#1e1e2e',

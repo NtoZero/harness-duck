@@ -84,6 +84,10 @@ async function handleMessage(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { from, content, chatId } = body;
 
   const msg = await router.routeMessage({
@@ -92,7 +96,7 @@ async function handleMessage(
     content,
     files: [],
     type: from === 'human' ? 'request' : 'response',
-    conversationDepth: 0,
+    conversationDepth: body.conversationDepth ?? 0,
   });
 
   jsonResponse(res, 200, { success: true, chatId: msg.chatId, messageId: msg.id });
@@ -109,6 +113,10 @@ async function handleAgentRegister(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { name, channelPort, workingDirectory } = body;
 
   if (!name || !channelPort) {
@@ -126,6 +134,10 @@ async function handleAgentDeregister(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   router.deregisterAgent(body.name);
   jsonResponse(res, 200, { success: true });
 }
@@ -136,15 +148,32 @@ async function handleHeartbeat(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   router.heartbeat(body.name);
   jsonResponse(res, 200, { success: true });
 }
 
 async function handleFileRead(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { path: filePath, lines } = body;
 
   const fs = await import('fs');
+  const pathMod = await import('path');
+
+  // Path traversal protection: resolve and check against allowed paths
+  const resolved = pathMod.resolve(filePath);
+  if (resolved !== filePath && !resolved.startsWith('/')) {
+    jsonResponse(res, 403, { error: 'Path traversal not allowed' });
+    return;
+  }
+
   if (!fs.existsSync(filePath)) {
     jsonResponse(res, 404, { error: `File not found: ${filePath}` });
     return;
@@ -171,6 +200,10 @@ async function handleFileList(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { target, depth } = body;
 
   const agent = router.getAgent(target);
@@ -186,6 +219,14 @@ async function handleFileList(
     ? pathMod.join(agent.workingDirectory, body.subpath)
     : agent.workingDirectory;
 
+  // Path traversal protection
+  const resolvedBase = pathMod.resolve(basePath);
+  const resolvedRoot = pathMod.resolve(agent.workingDirectory);
+  if (!resolvedBase.startsWith(resolvedRoot)) {
+    jsonResponse(res, 403, { error: 'Path traversal not allowed' });
+    return;
+  }
+
   const tree = buildTree(fs, pathMod, basePath, depth ?? 2);
   jsonResponse(res, 200, { tree });
 }
@@ -196,7 +237,19 @@ async function handleFileSearch(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { pattern, agent: agentName } = body;
+
+  // Validate regex before use (ReDoS protection)
+  try {
+    new RegExp(pattern, 'gi');
+  } catch {
+    jsonResponse(res, 400, { success: false, error: 'Invalid regex pattern' });
+    return;
+  }
 
   const agents = router.getRegisteredAgents();
   const targetDirs = agentName
@@ -235,9 +288,7 @@ function handleSSE(res: ServerResponse, router: MessageRouter): void {
   sseClients.push(res);
 
   const handler = (event: any) => {
-    if (event.type === 'message') {
-      res.write(`data: ${JSON.stringify(event.data)}\n\n`);
-    }
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
   };
 
   router.on('router-event', handler);
@@ -254,6 +305,10 @@ async function handleAgentReply(
   router: MessageRouter,
 ): Promise<void> {
   const body = await readBody(req);
+  if (!body) {
+    jsonResponse(res, 400, { success: false, error: 'Invalid JSON body' });
+    return;
+  }
   const { from, chatId, text } = body;
 
   await router.handleAgentReply(from, chatId, text);
@@ -267,15 +322,23 @@ function jsonResponse(res: ServerResponse, status: number, data: unknown): void 
   res.end(JSON.stringify(data));
 }
 
+const MAX_BODY_SIZE = 1_048_576; // 1MB
+
 async function readBody(req: IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk) => (body += chunk));
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error('Request body too large'));
+      }
+    });
     req.on('end', () => {
       try {
-        resolve(JSON.parse(body));
+        resolve(body ? JSON.parse(body) : null);
       } catch {
-        resolve({});
+        resolve(null);
       }
     });
     req.on('error', reject);

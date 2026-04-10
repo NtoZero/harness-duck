@@ -140,6 +140,7 @@ export class MessageRouter extends EventEmitter {
         message: `Agent "${fullMsg.from}" is sending too many messages. Cooldown applied.`,
         conversation: fullMsg.chatId,
       });
+      this.store.saveMessage(fullMsg);
       return fullMsg;
     }
 
@@ -218,7 +219,7 @@ export class MessageRouter extends EventEmitter {
   // ─── @Mention Parsing ───
 
   parseMentions(content: string): string[] {
-    const pattern = /@(\S+)/g;
+    const pattern = /@([\w가-힣][\w가-힣-]*)/g;
     const mentions: string[] = [];
     let match;
     while ((match = pattern.exec(content)) !== null) {

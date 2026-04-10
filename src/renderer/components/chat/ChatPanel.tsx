@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { useChatStore } from '../../stores/chatStore';
 import { useAgentStore } from '../../stores/agentStore';
@@ -8,8 +8,6 @@ import { MessageItem } from './MessageItem';
 import { ChatInput } from './ChatInput';
 import { DateDivider } from './DateDivider';
 import { LoopWarningBanner } from './LoopWarningBanner';
-import { FilePreviewPanel } from './FilePreviewPanel';
-import type { FileContent } from '@shared/types';
 
 export const ChatPanel: React.FC = () => {
   const messages = useChatStore((s) => s.messages);
@@ -40,8 +38,6 @@ export const ChatPanel: React.FC = () => {
     // We only pass (content, files) -- no separate `to` array.
     sendMessage(content, files);
   };
-
-  const [previewFile, setPreviewFile] = useState<FileContent | null>(null);
 
   const handleFileClick = (path: string) => {
     openFile(path);
@@ -116,8 +112,10 @@ export const ChatPanel: React.FC = () => {
           const senderAgent = agents.find((a) => a.name === msg.from);
           const agentIndex = agents.findIndex((a) => a.name === msg.from);
 
-          // Show loop warning when conversation depth is high
-          const showLoopWarning = msg.conversationDepth >= 4;
+          // Show loop warning only at the boundary (first message crossing threshold)
+          const prevMsg = i > 0 ? messages[i - 1] : null;
+          const showLoopWarning = msg.conversationDepth >= 4 &&
+            (!prevMsg || prevMsg.conversationDepth < 4);
 
           return (
             <React.Fragment key={msg.id}>
@@ -157,16 +155,6 @@ export const ChatPanel: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* File Preview */}
-      <FilePreviewPanel
-        file={previewFile}
-        onClose={() => setPreviewFile(null)}
-        onOpenInViewer={(path) => {
-          handleFileClick(path);
-          setPreviewFile(null);
-        }}
-      />
 
       {/* Input */}
       <ChatInput agents={agents} onSend={handleSend} />

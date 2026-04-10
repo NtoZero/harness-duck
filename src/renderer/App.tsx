@@ -37,15 +37,21 @@ export const App: React.FC = () => {
   const openModals = useUIStore((s) => s.openModals);
   const closeModal = useUIStore((s) => s.closeModal);
   const createAgent = useAgentStore((s) => s.createAgent);
-  const approvalStore = useApprovalStore();
+  const approvalPending = useApprovalStore((s) => s.pending);
+  const approvalHistory = useApprovalStore((s) => s.history);
+  const approvalAutoRules = useApprovalStore((s) => s.autoRules);
+  const approvalApprove = useApprovalStore((s) => s.approve);
+  const approvalDeny = useApprovalStore((s) => s.deny);
+  const approvalSetAutoRules = useApprovalStore((s) => s.setAutoRules);
+  const approvalLoadRules = useApprovalStore((s) => s.loadRules);
   const openFile = useFileStore((s) => s.openFile);
 
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     api.settings.get().then((s) => { if (s) setSettings(s); }).catch(() => {});
-    approvalStore.loadRules();
-  }, []);
+    approvalLoadRules();
+  }, [approvalLoadRules]);
 
   return (
     <ErrorBoundary>
@@ -63,11 +69,11 @@ export const App: React.FC = () => {
 
       <ApprovalDashboard
         isOpen={openModals.has('approvalDashboard')}
-        approvals={{ pending: approvalStore.pending, history: approvalStore.history }}
-        autoApproveRules={approvalStore.autoRules}
-        onApprove={approvalStore.approve}
-        onDeny={approvalStore.deny}
-        onRuleChange={approvalStore.setAutoRules}
+        approvals={{ pending: approvalPending, history: approvalHistory }}
+        autoApproveRules={approvalAutoRules}
+        onApprove={approvalApprove}
+        onDeny={approvalDeny}
+        onRuleChange={approvalSetAutoRules}
         onClose={() => closeModal('approvalDashboard')}
       />
 

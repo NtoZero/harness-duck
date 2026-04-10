@@ -38,7 +38,7 @@ export class SessionStore {
       this.db = new SQL.Database();
     }
 
-    this.db.run('PRAGMA journal_mode = WAL');
+    // Note: WAL pragma removed — sql.js (WASM) runs in-memory, WAL is no-op
     this.db.run('PRAGMA foreign_keys = ON');
     this.runMigrations();
     this.persist();

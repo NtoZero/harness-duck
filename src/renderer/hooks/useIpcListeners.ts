@@ -13,6 +13,8 @@ export function useIpcListeners() {
   const updateAgentState = useAgentStore((s) => s.updateAgentState);
   const addMessage = useChatStore((s) => s.addMessage);
   const addApprovalRequest = useApprovalStore((s) => s.addRequest);
+  const approveApproval = useApprovalStore((s) => s.approve);
+  const denyApproval = useApprovalStore((s) => s.deny);
   const addNotification = useUIStore((s) => s.addNotification);
 
   useEffect(() => {
@@ -47,11 +49,11 @@ export function useIpcListeners() {
         actions: [
           {
             label: '승인',
-            onClick: () => api.approval.respond(request.id, true),
+            onClick: () => approveApproval([request.id]),
           },
           {
             label: '거부',
-            onClick: () => api.approval.respond(request.id, false),
+            onClick: () => denyApproval([request.id]),
           },
         ],
       });
@@ -63,5 +65,5 @@ export function useIpcListeners() {
       unsubLoopWarning();
       unsubApproval();
     };
-  }, [updateAgentState, addMessage, addApprovalRequest, addNotification]);
+  }, [updateAgentState, addMessage, addApprovalRequest, approveApproval, denyApproval, addNotification]);
 }

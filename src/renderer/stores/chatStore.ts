@@ -21,14 +21,41 @@ export const useChatStore = create<ChatStore>((set) => ({
   unreadCount: 0,
 
   sendMessage: async (content, files) => {
-    await api.chat.send(content, files);
+    // Optimistic update: show message immediately
+    const optimisticId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: ChatMessage = {
+      id: optimisticId,
+      chatId: '',
+      from: 'human',
+      to: [],
+      content,
+      files: files ?? [],
+      type: 'request',
+      timestamp: new Date(),
+      conversationDepth: 0,
+    };
+    set((s) => ({ messages: [...s.messages, optimistic] }));
+
+    try {
+      await api.chat.send(content, files);
+    } catch {
+      // Remove optimistic message on failure
+      set((s) => ({ messages: s.messages.filter((m) => m.id !== optimisticId) }));
+    }
   },
 
   addMessage: (message) => {
-    set((s) => ({
-      messages: [...s.messages, message],
-      unreadCount: s.unreadCount + 1,
-    }));
+    set((s) => {
+      // Dedup: skip if message ID already exists, or replace optimistic temp message
+      const filtered = s.messages.filter((m) =>
+        m.id !== message.id &&
+        !(m.id.startsWith('temp-') && m.from === message.from && m.content === message.content),
+      );
+      return {
+        messages: [...filtered, message],
+        unreadCount: s.unreadCount + 1,
+      };
+    });
   },
 
   resetUnread: () => set({ unreadCount: 0 }),

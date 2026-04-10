@@ -107,14 +107,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({ agents, onSend, disabled }
         />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <button
-            onClick={() => {}}
+            disabled
+            title="파일 첨부 (준비 중)"
             style={{
               padding: 'var(--space-2)',
               color: 'var(--color-text-tertiary)',
-              cursor: 'pointer',
+              cursor: 'not-allowed',
               borderRadius: 'var(--border-radius-sm)',
               background: 'none',
               border: 'none',
+              opacity: 0.4,
             }}
           >
             <Paperclip size={16} />

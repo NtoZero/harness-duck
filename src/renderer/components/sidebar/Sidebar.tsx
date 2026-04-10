@@ -32,6 +32,9 @@ export const Sidebar: React.FC = () => {
   const openModal = useUIStore((s) => s.openModal);
   const setActiveView = useUIStore((s) => s.setActiveView);
 
+  const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
+  const [hoveredNavTarget, setHoveredNavTarget] = useState<string | null>(null);
+
   const [contextMenu, setContextMenu] = useState<{
     agent: AgentState;
     position: { x: number; y: number };
@@ -111,19 +114,15 @@ export const Sidebar: React.FC = () => {
               borderRadius: 'var(--border-radius-sm)',
               cursor: 'pointer',
               backgroundColor:
-                activeAgentId === agent.id ? 'var(--color-bg-surface1)' : 'transparent',
+                activeAgentId === agent.id
+                  ? 'var(--color-bg-surface1)'
+                  : hoveredAgentId === agent.id
+                    ? 'var(--color-bg-surface0)'
+                    : 'transparent',
               marginBottom: 'var(--space-1)',
             }}
-            onMouseEnter={(e) => {
-              if (activeAgentId !== agent.id) {
-                (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--color-bg-surface0)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (activeAgentId !== agent.id) {
-                (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-              }
-            }}
+            onMouseEnter={() => setHoveredAgentId(agent.id)}
+            onMouseLeave={() => setHoveredAgentId(null)}
           >
             <AgentAvatar name={agent.name} status={agent.status} size="sm" colorIndex={index} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -248,13 +247,10 @@ export const Sidebar: React.FC = () => {
               borderRadius: 'var(--border-radius-sm)',
               background: 'none',
               border: 'none',
+              backgroundColor: hoveredNavTarget === target ? 'var(--color-bg-surface0)' : 'transparent',
             }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--color-bg-surface0)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent';
-            }}
+            onMouseEnter={() => setHoveredNavTarget(target)}
+            onMouseLeave={() => setHoveredNavTarget(null)}
           >
             <Icon size={16} />
             {label}

@@ -10,12 +10,19 @@ import type { AgentConfig, AgentState, ApprovalRequest, AutoApproveRule } from '
 import type { SessionStore } from './session-store';
 import type { MessageRouter } from './message-router';
 
+const MAX_RESTARTS = 3;
+const RESTART_WINDOW_MS = 60_000;
+const AGENT_NAME_PATTERN = /^[\w가-힣][\w가-힣-]{0,49}$/;
+
 interface ManagedAgent {
   config: AgentConfig;
   state: AgentState;
   ptyProcess: pty.IPty | null;
   channelProcess: ChildProcessLike | null;
   outputBuffer: string;
+  intentionallyStopped: boolean;
+  restartCount: number;
+  lastRestartTime: number;
 }
 
 interface ChildProcessLike {
@@ -61,6 +68,10 @@ export class AgentManager extends EventEmitter {
     autoApprovePatterns?: string[];
     sharedDocPaths?: string[];
   }): Promise<AgentConfig> {
+    if (!AGENT_NAME_PATTERN.test(input.name)) {
+      throw new Error(`Invalid agent name "${input.name}". Use letters, digits, hyphens, or Korean characters (max 50 chars).`);
+    }
+
     if (this.agents.has(input.name)) {
       throw new Error(`Agent "${input.name}" already exists`);
     }
@@ -92,7 +103,7 @@ export class AgentManager extends EventEmitter {
       lastActivity: new Date(),
     };
 
-    this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '' });
+    this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '', intentionallyStopped: false, restartCount: 0, lastRestartTime: 0 });
     this.store.saveAgent(config);
     this.emitStateUpdate(state);
 
@@ -133,33 +144,63 @@ export class AgentManager extends EventEmitter {
     managed.state.pid = ptyProcess.pid;
     managed.state.status = 'running';
     managed.state.lastActivity = new Date();
-
-    // Forward PTY data to renderer + detect approvals and token usage
-    ptyProcess.onData((data) => {
-      this.emit('terminal-data', { agentId: config.id, data });
-      managed.state.lastActivity = new Date();
-      this.processTerminalOutput(managed, data);
-    });
+    managed.intentionallyStopped = false;
 
     ptyProcess.onExit(({ exitCode }) => {
-      managed.state.status = exitCode === 0 ? 'idle' : 'error';
       managed.state.pid = undefined;
       managed.ptyProcess = null;
       this.router.deregisterAgent(config.name);
+
+      // If intentionally stopped, just go idle — no auto-restart
+      if (managed.intentionallyStopped) {
+        managed.state.status = 'idle';
+        this.emitStateUpdate(managed.state);
+        return;
+      }
+
+      managed.state.status = exitCode === 0 ? 'idle' : 'error';
       this.emitStateUpdate(managed.state);
 
-      // Auto-restart on unexpected crash
+      // Auto-restart on unexpected crash with backoff and max retries
       if (exitCode !== 0 && exitCode !== null) {
+        const now = Date.now();
+        if (now - managed.lastRestartTime > RESTART_WINDOW_MS) {
+          managed.restartCount = 0;
+        }
+        if (managed.restartCount >= MAX_RESTARTS) {
+          console.error(`Agent "${config.name}" exceeded max restart attempts (${MAX_RESTARTS}). Staying in error state.`);
+          return;
+        }
+        managed.restartCount++;
+        managed.lastRestartTime = now;
+        const delay = Math.min(5000 * Math.pow(2, managed.restartCount - 1), 30000);
         setTimeout(() => {
           if (managed.state.status === 'error') {
             this.startAgent(config.name).catch(() => {});
           }
-        }, 5000);
+        }, delay);
       }
     });
 
-    // 4. Register with message router
-    this.router.registerAgent(config.name, config.channelPort, config.workingDirectory);
+    // 4. Defer router registration until PTY produces first output (agent is ready)
+    let registered = false;
+    const registerOnce = () => {
+      if (!registered) {
+        registered = true;
+        this.router.registerAgent(config.name, config.channelPort, config.workingDirectory);
+      }
+    };
+    // Register after first data or after 3 second timeout (whichever comes first)
+    const regTimeout = setTimeout(registerOnce, 3000);
+
+    // Forward PTY data to renderer + detect approvals and token usage
+    ptyProcess.onData((data) => {
+      registerOnce();
+      clearTimeout(regTimeout);
+      this.emit('terminal-data', { agentId: config.id, data });
+      managed.state.lastActivity = new Date();
+      this.processTerminalOutput(managed, data);
+    });
 
     // 5. Emit state update
     this.emitStateUpdate(managed.state);
@@ -168,6 +209,8 @@ export class AgentManager extends EventEmitter {
   async stopAgent(nameOrId: string): Promise<void> {
     const managed = this.findAgent(nameOrId);
     if (!managed) throw new Error(`Agent not found: ${nameOrId}`);
+
+    managed.intentionallyStopped = true;
 
     if (managed.ptyProcess) {
       managed.ptyProcess.kill();
@@ -199,12 +242,12 @@ export class AgentManager extends EventEmitter {
     await Promise.all(promises);
   }
 
-  deleteAgent(nameOrId: string): void {
+  async deleteAgent(nameOrId: string): Promise<void> {
     const managed = this.findAgent(nameOrId);
     if (!managed) return;
 
     if (managed.state.status === 'running') {
-      this.stopAgent(nameOrId).catch(() => {});
+      await this.stopAgent(nameOrId);
     }
 
     this.agents.delete(managed.config.name);
@@ -304,7 +347,7 @@ export class AgentManager extends EventEmitter {
         tokenUsage: { input: 0, output: 0 },
         lastActivity: new Date(),
       };
-      this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '' });
+      this.agents.set(config.name, { config, state, ptyProcess: null, channelProcess: null, outputBuffer: '', intentionallyStopped: false, restartCount: 0, lastRestartTime: 0 });
       if (config.channelPort >= this.nextPort) {
         this.nextPort = config.channelPort + 1;
       }
@@ -324,7 +367,11 @@ export class AgentManager extends EventEmitter {
       .map((p) => `- ${p}`)
       .join('\n');
 
-    const content = `<!-- Auto-generated by ClaudeTeam. Restart agent after editing. -->
+    const SECTION_START = '<!-- CLAUDETEAM:START -->';
+    const SECTION_END = '<!-- CLAUDETEAM:END -->';
+
+    const content = `${SECTION_START}
+<!-- Auto-generated by ClaudeTeam. Restart agent after editing. -->
 
 # Role
 
@@ -342,27 +389,27 @@ ${sharedDocs ? `# Shared Documents\n\n${sharedDocs}\n` : ''}
 3. Always use the reply tool to respond.
 4. If file paths are included, read and analyze those files directly.
 5. Do not ask follow-up questions after responding (loop prevention).
-`;
+${SECTION_END}`;
 
     const claudeMdPath = path.join(config.workingDirectory, 'CLAUDE.md');
 
-    // Preserve existing CLAUDE.md by prepending
+    // Preserve existing CLAUDE.md by stripping our section and prepending
     let existingContent = '';
     if (fs.existsSync(claudeMdPath)) {
       const existing = fs.readFileSync(claudeMdPath, 'utf-8');
-      // Strip previously injected ClaudeTeam section
-      const marker = '<!-- Auto-generated by ClaudeTeam';
-      const endMarker = '# Communication Rules';
-      if (existing.includes(marker)) {
-        const endIdx = existing.indexOf('\n', existing.indexOf('5. Do not ask follow-up'));
-        existingContent = existing.substring(endIdx !== -1 ? endIdx + 1 : existing.length).trim();
+      const startIdx = existing.indexOf(SECTION_START);
+      const endIdx = existing.indexOf(SECTION_END);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const before = existing.substring(0, startIdx).trim();
+        const after = existing.substring(endIdx + SECTION_END.length).trim();
+        existingContent = [before, after].filter(Boolean).join('\n\n');
       } else {
         existingContent = existing;
       }
     }
 
     const finalContent = existingContent
-      ? `${content}\n---\n\n${existingContent}`
+      ? `${content}\n\n---\n\n${existingContent}`
       : content;
 
     fs.writeFileSync(claudeMdPath, finalContent, 'utf-8');
@@ -413,8 +460,9 @@ ${sharedDocs ? `# Shared Documents\n\n${sharedDocs}\n` : ''}
       managed.outputBuffer = managed.outputBuffer.slice(-4096);
     }
 
-    // Detect approval request pattern [Y/n]
-    if (APPROVAL_PATTERN.test(data) && managed.state.status === 'running') {
+    // Detect approval request pattern [Y/n] (strip ANSI codes before testing)
+    const strippedData = data.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    if (APPROVAL_PATTERN.test(strippedData) && managed.state.status === 'running') {
       this.handleApprovalDetected(managed);
     }
 

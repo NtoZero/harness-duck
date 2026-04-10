@@ -9,7 +9,8 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-const ROUTER_URL = process.env.CLAUDETEAM_ROUTER_URL || 'http://127.0.0.1:7632';
+const ROUTER_PORT = parseInt(process.env.CLAUDETEAM_ROUTER_PORT || '7632', 10);
+const ROUTER_URL = `http://127.0.0.1:${ROUTER_PORT}`;
 const AGENT_NAME = process.env.CLAUDETEAM_AGENT_NAME || 'unknown';
 
 const server = new Server(
@@ -98,86 +99,93 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  switch (name) {
-    case 'team_message': {
-      const res = await fetch(`${ROUTER_URL}/api/message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: AGENT_NAME,
-          content: (args as any).content,
-        }),
-      });
-      const data = await res.json();
-      return {
-        content: [
-          { type: 'text' as const, text: `Message sent (chat_id: ${(data as any).chatId})` },
-        ],
-      };
-    }
-
-    case 'team_read_file': {
-      const res = await fetch(`${ROUTER_URL}/api/fs/read`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          path: (args as any).path,
-          lines: (args as any).lines,
-          requester: AGENT_NAME,
-        }),
-      });
-      const data = (await res.json()) as any;
-      if (data.error) {
-        return { content: [{ type: 'text' as const, text: `Error: ${data.error}` }], isError: true };
+  try {
+    switch (name) {
+      case 'team_message': {
+        const res = await fetch(`${ROUTER_URL}/api/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: AGENT_NAME,
+            content: (args as any).content,
+          }),
+        });
+        const data = await res.json();
+        return {
+          content: [
+            { type: 'text' as const, text: `Message sent (chat_id: ${(data as any).chatId})` },
+          ],
+        };
       }
-      return { content: [{ type: 'text' as const, text: data.content }] };
-    }
 
-    case 'team_list_files': {
-      const res = await fetch(`${ROUTER_URL}/api/fs/list`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target: (args as any).agent,
-          subpath: (args as any).subpath,
-          depth: (args as any).depth ?? 2,
-        }),
-      });
-      const data = (await res.json()) as any;
-      return { content: [{ type: 'text' as const, text: data.tree ?? 'No results' }] };
-    }
+      case 'team_read_file': {
+        const res = await fetch(`${ROUTER_URL}/api/fs/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            path: (args as any).path,
+            lines: (args as any).lines,
+            requester: AGENT_NAME,
+          }),
+        });
+        const data = (await res.json()) as any;
+        if (data.error) {
+          return { content: [{ type: 'text' as const, text: `Error: ${data.error}` }], isError: true };
+        }
+        return { content: [{ type: 'text' as const, text: data.content }] };
+      }
 
-    case 'team_search_files': {
-      const res = await fetch(`${ROUTER_URL}/api/fs/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pattern: (args as any).pattern,
-          agent: (args as any).agent,
-          glob: (args as any).glob,
-        }),
-      });
-      const data = (await res.json()) as any;
-      const formatted = (data.results ?? [])
-        .map((r: any) => `${r.file}:${r.line}: ${r.content}`)
-        .join('\n');
-      return { content: [{ type: 'text' as const, text: formatted || 'No results' }] };
-    }
+      case 'team_list_files': {
+        const res = await fetch(`${ROUTER_URL}/api/fs/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            target: (args as any).agent,
+            subpath: (args as any).subpath,
+            depth: (args as any).depth ?? 2,
+          }),
+        });
+        const data = (await res.json()) as any;
+        return { content: [{ type: 'text' as const, text: data.tree ?? 'No results' }] };
+      }
 
-    case 'team_status': {
-      const res = await fetch(`${ROUTER_URL}/api/agents`);
-      const agents = (await res.json()) as any[];
-      const formatted = agents
-        .map((a) => `[${a.status}] ${a.name}: ${a.workingDirectory}`)
-        .join('\n');
-      return { content: [{ type: 'text' as const, text: formatted || 'No agents registered' }] };
-    }
+      case 'team_search_files': {
+        const res = await fetch(`${ROUTER_URL}/api/fs/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pattern: (args as any).pattern,
+            agent: (args as any).agent,
+            glob: (args as any).glob,
+          }),
+        });
+        const data = (await res.json()) as any;
+        const formatted = (data.results ?? [])
+          .map((r: any) => `${r.file}:${r.line}: ${r.content}`)
+          .join('\n');
+        return { content: [{ type: 'text' as const, text: formatted || 'No results' }] };
+      }
 
-    default:
-      return {
-        content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
-        isError: true,
-      };
+      case 'team_status': {
+        const res = await fetch(`${ROUTER_URL}/api/agents`);
+        const agents = (await res.json()) as any[];
+        const formatted = agents
+          .map((a) => `[${a.status}] ${a.name}: ${a.workingDirectory}`)
+          .join('\n');
+        return { content: [{ type: 'text' as const, text: formatted || 'No agents registered' }] };
+      }
+
+      default:
+        return {
+          content: [{ type: 'text' as const, text: `Unknown tool: ${name}` }],
+          isError: true,
+        };
+    }
+  } catch (err) {
+    return {
+      content: [{ type: 'text' as const, text: `Error: ${(err as Error).message}` }],
+      isError: true,
+    };
   }
 });
 

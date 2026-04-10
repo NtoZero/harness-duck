@@ -56,7 +56,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   };
 
   const renderInlineContent = (text: string, keyBase: number) => {
-    const mentionRegex = /@(\S+)/g;
+    const mentionRegex = /@([\w가-힣][\w가-힣-]*)/g;
     const segments: React.ReactNode[] = [];
     let lastIdx = 0;
     let m;

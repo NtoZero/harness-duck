@@ -82,7 +82,7 @@ export const AgentCreateDialog: React.FC<AgentCreateDialogProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
       }}
-      onClick={onClose}
+      onClick={() => { resetForm(); onClose(); }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -305,7 +305,7 @@ export const AgentCreateDialog: React.FC<AgentCreateDialogProps> = ({
           }}
         >
           <button
-            onClick={onClose}
+            onClick={() => { resetForm(); onClose(); }}
             style={{
               padding: 'var(--space-2) var(--space-4)',
               borderRadius: 'var(--border-radius-sm)',

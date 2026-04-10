@@ -24,31 +24,47 @@ export const useApprovalStore = create<ApprovalStore>((set, get) => ({
   },
 
   approve: async (ids) => {
-    for (const id of ids) {
-      await api.approval.respond(id, true);
-    }
-    const { pending } = get();
-    const approved = pending
+    // Optimistic update first
+    const snapshot = get().pending;
+    const approved = snapshot
       .filter((r) => ids.includes(r.id))
       .map((r) => ({ ...r, status: 'approved' as const }));
     set((s) => ({
       pending: s.pending.filter((r) => !ids.includes(r.id)),
       history: [...s.history, ...approved],
     }));
+    // IPC calls in parallel
+    try {
+      await Promise.all(ids.map((id) => api.approval.respond(id, true)));
+    } catch {
+      // Rollback on failure
+      set((s) => ({
+        pending: [...s.pending, ...snapshot.filter((r) => ids.includes(r.id))],
+        history: s.history.filter((r) => !ids.includes(r.id)),
+      }));
+    }
   },
 
   deny: async (ids) => {
-    for (const id of ids) {
-      await api.approval.respond(id, false);
-    }
-    const { pending } = get();
-    const denied = pending
+    // Optimistic update first
+    const snapshot = get().pending;
+    const denied = snapshot
       .filter((r) => ids.includes(r.id))
       .map((r) => ({ ...r, status: 'denied' as const }));
     set((s) => ({
       pending: s.pending.filter((r) => !ids.includes(r.id)),
       history: [...s.history, ...denied],
     }));
+    // IPC calls in parallel
+    try {
+      await Promise.all(ids.map((id) => api.approval.respond(id, false)));
+    } catch {
+      // Rollback on failure
+      set((s) => ({
+        pending: [...s.pending, ...snapshot.filter((r) => ids.includes(r.id))],
+        history: s.history.filter((r) => !ids.includes(r.id)),
+      }));
+    }
   },
 
   setAutoRules: (rules) => {
